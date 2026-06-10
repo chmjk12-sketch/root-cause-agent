@@ -1,0 +1,98 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+env:
+  APP_NAME: root-cause-agent
+  APP_PORT: "3003"
+  REGISTRY_URL: crpi-2hhvyuuzflfxsyey.cn-beijing.personal.cr.aliyuncs.com
+  REGISTRY_NAMESPACE: chmjk67
+  ACR_REGION: cn-beijing
+  DOMAIN: chmjk67.top
+  ECS_IP: 39.105.86.184
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure ACR repository exists
+        run: |
+          sign_aliyun() {
+            local ACTION="$1"; shift
+            local PARAMS="AccessKeyId=${{ secrets.ALIYUN_ACCESS_KEY_ID }}&Action=${ACTION}&Format=JSON&SignatureMethod=HMAC-SHA1&SignatureNonce=$(date +%s%N)&SignatureVersion=1.0&Timestamp=$(date -u +'%Y-%m-%dT%25%3A%25H%25%3A%25M%25%3S%25Z')&Version=2016-06-07"
+            for kv in "$@"; do PARAMS="${PARAMS}&${kv}"; done
+            local SORTED=$(echo "$PARAMS" | tr '&' '\n' | sort | tr '\n' '&' | sed 's/&$//')
+            local STR_TO_SIGN="GET&$(python3 -c 'import urllib.parse; print(urllib.parse.quote("/", safe=""))')&$(python3 -c 'import urllib.parse; print(urllib.parse.quote("'"$SORTED"'", safe=""))')"
+            local SIG=$(echo -n "$STR_TO_SIGN" | openssl dgst -sha1 -hmac "${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}&" -binary | base64)
+            SIG=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$SIG', safe=''))")
+            echo "https://cr.${ACR_REGION}.aliyuncs.com/?${PARAMS}&Signature=${SIG}"
+          }
+          URL=$(sign_aliyun "GetRepository" "RepoNamespace=${REGISTRY_NAMESPACE}" "RepoName=${APP_NAME}")
+          RESP=$(curl -s "$URL")
+          if echo "$RESP" | grep -q '"Code"'; then
+            URL=$(sign_aliyun "CreateRepository" "RepoNamespace=${REGISTRY_NAMESPACE}" "RepoName=${APP_NAME}" "RepoType=PUBLIC" "Summary=${APP_NAME}")
+            curl -s "$URL"
+            echo "ACR repo created"
+          else
+            echo "ACR repo exists"
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_URL }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY_URL }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.APP_NAME }}:latest
+            ${{ env.REGISTRY_URL }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.APP_NAME }}:${{ github.sha }}
+
+      - uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            /opt/app/scripts/deploy.sh \
+              --app-name ${{ env.APP_NAME }} \
+              --image ${{ env.REGISTRY_URL }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.APP_NAME }}:${{ github.sha }} \
+              --port ${{ env.APP_PORT }} \
+              --internal-port 80 \
+              --health-path /
+            ROUTE_LINE="${{ env.APP_NAME }}.${{ env.DOMAIN }} {"
+            if ! grep -qF "$ROUTE_LINE" /opt/app/Caddyfile; then
+              sed -i "/^:80 {/i\\${{ env.APP_NAME }}.${{ env.DOMAIN }} {\n  reverse_proxy ${{ env.APP_NAME }}_app:80\n}\n" /opt/app/Caddyfile
+              docker exec -w /etc/caddy caddy caddy reload
+            fi
+
+      - name: Ensure DNS A record exists
+        run: |
+          sign_dns() {
+            local ACTION="$1"; shift
+            local PARAMS="AccessKeyId=${{ secrets.ALIYUN_ACCESS_KEY_ID }}&Action=${ACTION}&Format=JSON&SignatureMethod=HMAC-SHA1&SignatureNonce=$(date +%s%N)&SignatureVersion=1.0&Timestamp=$(date -u +'%Y-%m-%dT%25%3A%25H%25%3A%25M%25%3S%25Z')&Version=2015-01-09"
+            for kv in "$@"; do PARAMS="${PARAMS}&${kv}"; done
+            local SORTED=$(echo "$PARAMS" | tr '&' '\n' | sort | tr '\n' '&' | sed 's/&$//')
+            local STR_TO_SIGN="GET&$(python3 -c 'import urllib.parse; print(urllib.parse.quote("/", safe=""))')&$(python3 -c 'import urllib.parse; print(urllib.parse.quote("'"$SORTED"'", safe=""))')"
+            local SIG=$(echo -n "$STR_TO_SIGN" | openssl dgst -sha1 -hmac "${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}&" -binary | base64)
+            SIG=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$SIG', safe=''))")
+            echo "https://alidns.aliyuncs.com/?${PARAMS}&Signature=${SIG}"
+          }
+          URL=$(sign_dns "DescribeDomainRecords" "DomainName=${DOMAIN}" "RRKeyWord=${APP_NAME}" "TypeKeyWord=A")
+          if ! curl -s "$URL" | grep -q '"Value":"'"${ECS_IP}"'"'; then
+            URL=$(sign_dns "AddDomainRecord" "DomainName=${DOMAIN}" "RR=${APP_NAME}" "Type=A" "Value=${ECS_IP}" "TTL=600")
+            curl -s "$URL"
+            echo "DNS record added"
+          else
+            echo "DNS record exists"
+          fi
+
+      - name: Verify deployment
+        run: |
+          sleep 5
+          curl -f "http://${ECS_IP}:${APP_PORT}/" && echo "OK" || echo "FAIL"
