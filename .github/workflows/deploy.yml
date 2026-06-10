@@ -18,25 +18,47 @@ jobs:
 
       - name: Ensure ACR repository exists
         run: |
-          sign_aliyun() {
-            local ACTION="$1"; shift
-            local PARAMS="AccessKeyId=${{ secrets.ALIYUN_ACCESS_KEY_ID }}&Action=${ACTION}&Format=JSON&SignatureMethod=HMAC-SHA1&SignatureNonce=$(date +%s%N)&SignatureVersion=1.0&Timestamp=$(date -u +'%Y-%m-%dT%25%3A%25H%25%3A%25M%25%3S%25Z')&Version=2016-06-07"
-            for kv in "$@"; do PARAMS="${PARAMS}&${kv}"; done
-            local SORTED=$(echo "$PARAMS" | tr '&' '\n' | sort | tr '\n' '&' | sed 's/&$//')
-            local STR_TO_SIGN="GET&$(python3 -c 'import urllib.parse; print(urllib.parse.quote("/", safe=""))')&$(python3 -c 'import urllib.parse; print(urllib.parse.quote("'"$SORTED"'", safe=""))')"
-            local SIG=$(echo -n "$STR_TO_SIGN" | openssl dgst -sha1 -hmac "${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}&" -binary | base64)
-            SIG=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$SIG', safe=''))")
-            echo "https://cr.${ACR_REGION}.aliyuncs.com/?${PARAMS}&Signature=${SIG}"
-          }
-          URL=$(sign_aliyun "GetRepository" "RepoNamespace=${REGISTRY_NAMESPACE}" "RepoName=${APP_NAME}")
-          RESP=$(curl -s "$URL")
-          if echo "$RESP" | grep -q '"Code"'; then
-            URL=$(sign_aliyun "CreateRepository" "RepoNamespace=${REGISTRY_NAMESPACE}" "RepoName=${APP_NAME}" "RepoType=PUBLIC" "Summary=${APP_NAME}")
-            curl -s "$URL"
-            echo "ACR repo created"
-          else
-            echo "ACR repo exists"
-          fi
+          python3 -c "
+import urllib.parse, hashlib, hmac, base64, time, uuid, os
+
+ak_id = os.environ['AK_ID']
+ak_secret = os.environ['AK_SECRET']
+region = os.environ['REGION']
+ns = os.environ['NS']
+repo = os.environ['REPO_NAME']
+
+def sign(action, **extras):
+    params = {
+        'Format': 'JSON', 'Version': '2016-06-07',
+        'AccessKeyId': ak_id, 'SignatureMethod': 'HMAC-SHA1',
+        'Timestamp': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+        'SignatureVersion': '1.0', 'SignatureNonce': str(uuid.uuid4()),
+        'Action': action, 'RepoNamespace': ns, 'RepoName': repo,
+    }
+    params.update(extras)
+    sorted_keys = sorted(params)
+    canonicalized = '&'.join(f'{urllib.parse.quote_plus(k)}={urllib.parse.quote_plus(str(params[k]))}' for k in sorted_keys)
+    string_to_sign = f'GET&{urllib.parse.quote_plus(\"/\")}&{urllib.parse.quote_plus(canonicalized)}'
+    sig = base64.b64encode(hmac.new(f'{ak_secret}&'.encode(), string_to_sign.encode(), hashlib.sha1).digest()).decode()
+    return f'https://cr.{region}.aliyuncs.com/?{canonicalized}&Signature={urllib.parse.quote_plus(sig)}'
+
+import requests
+url = sign('GetRepository')
+r = requests.get(url)
+if r.status_code == 200 and r.json().get('repo'):
+    print('ACR repo exists')
+else:
+    print('Creating ACR repo...')
+    url = sign('CreateRepository', RepoType='PUBLIC', Summary=repo)
+    r2 = requests.get(url)
+    print(f'Create: {r2.status_code} {r2.json().get(\"IsSuccess\", r2.text[:100])}')
+"
+        env:
+          AK_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          AK_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+          REGION: ${{ env.ACR_REGION }}
+          NS: ${{ env.REGISTRY_NAMESPACE }}
+          REPO_NAME: ${{ env.APP_NAME }}
 
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -73,24 +95,48 @@ jobs:
 
       - name: Ensure DNS A record exists
         run: |
-          sign_dns() {
-            local ACTION="$1"; shift
-            local PARAMS="AccessKeyId=${{ secrets.ALIYUN_ACCESS_KEY_ID }}&Action=${ACTION}&Format=JSON&SignatureMethod=HMAC-SHA1&SignatureNonce=$(date +%s%N)&SignatureVersion=1.0&Timestamp=$(date -u +'%Y-%m-%dT%25%3A%25H%25%3A%25M%25%3S%25Z')&Version=2015-01-09"
-            for kv in "$@"; do PARAMS="${PARAMS}&${kv}"; done
-            local SORTED=$(echo "$PARAMS" | tr '&' '\n' | sort | tr '\n' '&' | sed 's/&$//')
-            local STR_TO_SIGN="GET&$(python3 -c 'import urllib.parse; print(urllib.parse.quote("/", safe=""))')&$(python3 -c 'import urllib.parse; print(urllib.parse.quote("'"$SORTED"'", safe=""))')"
-            local SIG=$(echo -n "$STR_TO_SIGN" | openssl dgst -sha1 -hmac "${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}&" -binary | base64)
-            SIG=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$SIG', safe=''))")
-            echo "https://alidns.aliyuncs.com/?${PARAMS}&Signature=${SIG}"
-          }
-          URL=$(sign_dns "DescribeDomainRecords" "DomainName=${DOMAIN}" "RRKeyWord=${APP_NAME}" "TypeKeyWord=A")
-          if ! curl -s "$URL" | grep -q '"Value":"'"${ECS_IP}"'"'; then
-            URL=$(sign_dns "AddDomainRecord" "DomainName=${DOMAIN}" "RR=${APP_NAME}" "Type=A" "Value=${ECS_IP}" "TTL=600")
-            curl -s "$URL"
-            echo "DNS record added"
-          else
-            echo "DNS record exists"
-          fi
+          python3 -c "
+import urllib.parse, hashlib, hmac, base64, time, uuid, os
+
+ak_id = os.environ['AK_ID']
+ak_secret = os.environ['AK_SECRET']
+domain = os.environ['DOMAIN']
+rr = os.environ['RR']
+value = os.environ['VALUE']
+
+def sign(action, **extras):
+    params = {
+        'Format': 'JSON', 'Version': '2015-01-09',
+        'AccessKeyId': ak_id, 'SignatureMethod': 'HMAC-SHA1',
+        'Timestamp': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+        'SignatureVersion': '1.0', 'SignatureNonce': str(uuid.uuid4()),
+        'Action': action, 'DomainName': domain,
+    }
+    params.update(extras)
+    sorted_keys = sorted(params)
+    canonicalized = '&'.join(f'{urllib.parse.quote_plus(k)}={urllib.parse.quote_plus(str(params[k]))}' for k in sorted_keys)
+    string_to_sign = f'GET&{urllib.parse.quote_plus(\"/\")}&{urllib.parse.quote_plus(canonicalized)}'
+    sig = base64.b64encode(hmac.new(f'{ak_secret}&'.encode(), string_to_sign.encode(), hashlib.sha1).digest()).decode()
+    return f'https://alidns.aliyuncs.com/?{canonicalized}&Signature={urllib.parse.quote_plus(sig)}'
+
+import requests
+url = sign('DescribeDomainRecords', RRKeyWord=rr, TypeKeyWord='A')
+r = requests.get(url)
+records = r.json().get('DomainRecords', {}).get('Record', [])
+if any(rec['Value'] == value for rec in records):
+    print(f'DNS record exists: {rr}.{domain} -> {value}')
+else:
+    print(f'Adding DNS A record: {rr}.{domain} -> {value}')
+    url = sign('AddDomainRecord', RR=rr, Type='A', Value=value, TTL='600')
+    r2 = requests.get(url)
+    print(f'Add: {r2.status_code} RecordId={r2.json().get(\"RecordId\", \"?\")}')
+"
+        env:
+          AK_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          AK_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+          DOMAIN: ${{ env.DOMAIN }}
+          RR: ${{ env.APP_NAME }}
+          VALUE: ${{ env.ECS_IP }}
 
       - name: Verify deployment
         run: |
