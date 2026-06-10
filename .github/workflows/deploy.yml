@@ -7,7 +7,6 @@ env:
   APP_PORT: "3003"
   REGISTRY_URL: crpi-2hhvyuuzflfxsyey.cn-beijing.personal.cr.aliyuncs.com
   REGISTRY_NAMESPACE: chmjk67
-  ACR_REGION: cn-beijing
   DOMAIN: chmjk67.top
   ECS_IP: 39.105.86.184
 jobs:
@@ -15,44 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Ensure ACR repository exists
-        run: |
-          python3 -c "
-import urllib.parse, hashlib, hmac, base64, time, uuid, os, json, sys
-try: import requests
-except: sys.exit(0)
-
-ak_id = os.environ['AK_ID']
-ak_secret = os.environ['AK_SECRET']
-region = os.environ['REGION']
-ns = os.environ['NS']
-repo = os.environ['REPO_NAME']
-
-def sign(action, **extras):
-    p = dict(Format='JSON',Version='2016-06-07',AccessKeyId=ak_id,SignatureMethod='HMAC-SHA1',
-        Timestamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),SignatureVersion='1.0',
-        SignatureNonce=str(uuid.uuid4()),Action=action,RepoNamespace=ns,RepoName=repo)
-    p.update(extras)
-    ks = sorted(p)
-    c = '&'.join(urllib.parse.quote_plus(k)+'='+urllib.parse.quote_plus(str(p[k])) for k in ks)
-    s = 'GET&'+urllib.parse.quote_plus('/')+'&'+urllib.parse.quote_plus(c)
-    sig = base64.b64encode(hmac.new((ak_secret+'&').encode(),s.encode(),hashlib.sha1).digest()).decode()
-    return 'https://cr.'+region+'.aliyuncs.com/?'+c+'&Signature='+urllib.parse.quote_plus(sig)
-
-resp = requests.get(sign('GetRepository')).json()
-if resp.get('repo'):
-    print('ACR repo exists')
-else:
-    r2 = requests.get(sign('CreateRepository',RepoType='PUBLIC',Summary=repo))
-    print('Create:', r2.status_code, r2.json().get('IsSuccess','?'))
-"
-        env:
-          AK_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
-          AK_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
-          REGION: ${{ env.ACR_REGION }}
-          NS: ${{ env.REGISTRY_NAMESPACE }}
-          REPO_NAME: ${{ env.APP_NAME }}
 
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -81,49 +42,8 @@ else:
               --port ${{ env.APP_PORT }} \
               --internal-port 80 \
               --health-path /
-            ROUTE_LINE="${{ env.APP_NAME }}.${{ env.DOMAIN }} {"
-            if ! grep -qF "$ROUTE_LINE" /opt/app/Caddyfile; then
-              sed -i "/^:80 {/i\\${{ env.APP_NAME }}.${{ env.DOMAIN }} {\n  reverse_proxy ${{ env.APP_NAME }}_app:80\n}\n" /opt/app/Caddyfile
-              docker exec -w /etc/caddy caddy caddy reload
-            fi
-
-      - name: Ensure DNS A record exists
-        run: |
-          python3 -c "
-import urllib.parse, hashlib, hmac, base64, time, uuid, os, json, sys
-try: import requests
-except: sys.exit(0)
-
-ak_id = os.environ['AK_ID']; ak_secret = os.environ['AK_SECRET']
-domain = os.environ['DOMAIN']; rr = os.environ['RR']; value = os.environ['VALUE']
-
-def sign(action, **extras):
-    p = dict(Format='JSON',Version='2015-01-09',AccessKeyId=ak_id,SignatureMethod='HMAC-SHA1',
-        Timestamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),SignatureVersion='1.0',
-        SignatureNonce=str(uuid.uuid4()),Action=action,DomainName=domain)
-    p.update(extras)
-    ks = sorted(p)
-    c = '&'.join(urllib.parse.quote_plus(k)+'='+urllib.parse.quote_plus(str(p[k])) for k in ks)
-    s = 'GET&'+urllib.parse.quote_plus('/')+'&'+urllib.parse.quote_plus(c)
-    sig = base64.b64encode(hmac.new((ak_secret+'&').encode(),s.encode(),hashlib.sha1).digest()).decode()
-    return 'https://alidns.aliyuncs.com/?'+c+'&Signature='+urllib.parse.quote_plus(sig)
-
-resp = requests.get(sign('DescribeDomainRecords',RRKeyWord=rr,TypeKeyWord='A')).json()
-records = resp.get('DomainRecords',{}).get('Record',[])
-if any(r.get('Value')==value for r in records):
-    print('DNS record exists:',rr+'.'+domain+' -> '+value)
-else:
-    r2 = requests.get(sign('AddDomainRecord',RR=rr,Type='A',Value=value,TTL='600'))
-    print('DNS added:',r2.status_code,'RecordId='+str(r2.json().get('RecordId','?')))
-"
-        env:
-          AK_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
-          AK_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
-          DOMAIN: ${{ env.DOMAIN }}
-          RR: ${{ env.APP_NAME }}
-          VALUE: ${{ env.ECS_IP }}
 
       - name: Verify deployment
         run: |
-          sleep 5
-          curl -f "http://${ECS_IP}:${APP_PORT}/" && echo "OK" || echo "FAIL"
+          sleep 10
+          curl -f -s -o /dev/null "http://${ECS_IP}:${APP_PORT}/" && echo "OK" || echo "FAIL"
