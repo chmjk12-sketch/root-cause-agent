@@ -5,7 +5,7 @@ import json
 from typing import List, Dict, Any
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'reports.db')
+DB_PATH = os.environ.get('REPORTS_DB', os.path.join(os.path.dirname(__file__), 'reports.db'))
 
 
 def _get_conn():

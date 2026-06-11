@@ -563,7 +563,12 @@ async function startAiAnalysis(problem) {
     window._currentReportTitle = currentProblem;
 
     // Auto-save to backend history
-    await autoSaveReport(currentProblem, fullText);
+    const savedId = await autoSaveReport(currentProblem, fullText);
+    if (savedId) {
+      window._currentReportId = savedId;
+      window._currentReportStarred = false;
+      updateStarButton(false);
+    }
 
   } catch (err) {
     hideLoading();
@@ -591,9 +596,14 @@ async function autoSaveReport(problem, markdown) {
       opportunities: ['机会1', '机会2', '机会3'],
       markdown: markdown || ''
     };
-    await apiPost('/reports', report);
+    const result = await apiPost('/reports', report);
+    if (result && result.success) {
+      return report.id;
+    }
+    return null;
   } catch (e) {
     console.error('Auto-save report failed:', e);
+    return null;
   }
 }
 
@@ -741,11 +751,23 @@ function updateStarButton(starred) {
 
 // ===== Toggle star for current report in modal =====
 async function toggleStarCurrent() {
-  const id = window._currentReportId;
+  let id = window._currentReportId;
+  // If not saved yet, auto-save first
   if (!id) {
-    // Current analysis not yet saved - save it first then star
-    alert('请先保存到历史记录后再收藏');
-    return;
+    const markdown = window._currentReportMarkdown;
+    const problem = window._currentReportTitle || currentProblem;
+    if (!problem || !markdown) {
+      alert('请先进行分析');
+      return;
+    }
+    const savedId = await autoSaveReport(problem, markdown);
+    if (!savedId) {
+      alert('自动保存失败，请稍后重试');
+      return;
+    }
+    id = savedId;
+    window._currentReportId = id;
+    window._currentReportStarred = false;
   }
   const currentlyStarred = window._currentReportStarred || false;
   const newStar = !currentlyStarred;
