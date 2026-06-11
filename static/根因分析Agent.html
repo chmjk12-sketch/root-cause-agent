@@ -334,23 +334,6 @@
       </div>
     </div>
   </div>
-
-  <!-- API Config Toggle -->
-  <div class="api-toggle" onclick="toggleApi()">
-    <span>🔑 AI深度分析配置（可选）</span>
-    <span class="arrow" id="apiArrow">▼</span>
-  </div>
-  <div class="api-panel" id="apiPanel">
-    <input type="text" id="apiKey" value="sk-fb4dd8f653554df493de59cdcd530304" placeholder="API Key">
-    <input type="text" id="apiBase" value="https://api.deepseek.com/v1" placeholder="API Base URL">
-    <select id="modelSelect">
-      <option value="deepseek-chat" selected>DeepSeek Chat</option>
-      <option value="gpt-4o">GPT-4o</option>
-      <option value="gpt-4o-mini">GPT-4o Mini</option>
-      <option value="qwen-plus">通义千问 Plus</option>
-      <option value="qwen-turbo">通义千问 Turbo</option>
-    </select>
-  </div>
 </div>
 
   <!-- Result Page -->
@@ -409,8 +392,9 @@
     </div>
     <div class="modal-body" id="modalBody"></div>
     <div class="modal-footer" style="display:flex;gap:8px;">
-      <button class="btn btn-secondary" style="flex:1;" onclick="copyReport()">复制报告</button>
-      <button class="btn btn-primary" style="flex:1;" id="saveToNotionBtn" onclick="saveToNotion()">📝 保存到 Notion</button>
+      <button class="btn btn-secondary" style="flex:1;" onclick="copyReport()">📋 复制</button>
+      <button class="btn btn-secondary" style="flex:1;" id="starReportBtn" onclick="toggleStarCurrent()">☆ 收藏</button>
+      <button class="btn btn-primary" style="flex:1;" id="saveToNotionBtn" onclick="saveToNotion()">📝 Notion</button>
     </div>
   </div>
 </div>
@@ -501,12 +485,6 @@ async function switchPage(page) {
   }
 }
 
-// ===== Toggle API Panel =====
-function toggleApi() {
-  document.getElementById('apiPanel').classList.toggle('open');
-  document.querySelector('.api-toggle').classList.toggle('open');
-}
-
 // ===== Load Example =====
 const examples = [
   '销售额持续下降，客户流失严重',
@@ -526,40 +504,22 @@ function loadExample() {
 async function startAnalysis() {
   const problem = document.getElementById('problemInput').value.trim();
   if (!problem) { alert('请输入商业痛点'); return; }
-
-  const apiKey = document.getElementById('apiKey').value.trim();
-  if (!apiKey) {
-    alert('请先配置 API Key 才能进行分析');
-    toggleApi();
-    return;
-  }
-  await startAiAnalysis(problem, apiKey);
+  currentProblem = problem;
+  await startAiAnalysis(problem);
 }
 
 // ===== AI Analysis =====
-async function startAiAnalysis(problem, apiKey) {
+async function startAiAnalysis(problem) {
   showLoading('正在进行AI深度分析...');
-
-  const model = document.getElementById('modelSelect').value;
-  const base = document.getElementById('apiBase').value.trim() || 'https://api.openai.com/v1';
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
 
-    const response = await fetch(base.replace(/\/+$/, '') + '/chat/completions', {
+    const response = await fetch(API_BASE + '/analyze-full', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: '请分析以下商业痛点：\n\n' + problem }
-        ],
-        stream: true,
-        temperature: 0.7,
-        max_tokens: 4096,
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ problem }),
       signal: controller.signal,
     });
 
@@ -600,17 +560,39 @@ async function startAiAnalysis(problem, apiKey) {
     // Store for save-to-Notion
     window._currentReportMarkdown = fullText;
     window._currentReportTitle = currentProblem;
-    window._currentReportId = null; // 当前分析报告不存储到后端
+
+    // Auto-save to backend history
+    await autoSaveReport(currentProblem, fullText);
 
   } catch (err) {
     hideLoading();
     if (err.name === 'AbortError') {
-      alert('AI分析超时：请求超过30秒未响应\n\n请检查网络连接或稍后重试。');
+      alert('AI分析超时：请求超过120秒未响应\n\n请检查网络连接或稍后重试。');
     } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
       alert('网络请求失败：\n\n1. 请检查网络连接\n2. 如果使用手机预览，请确保允许网络访问\n3. 或尝试在浏览器中直接打开此文件');
     } else {
-      alert('AI分析失败：' + err.message + '\n\n请检查 API Key 和网络连接后重试。');
+      alert('AI分析失败：' + err.message + '\n\n请检查网络连接后重试。');
     }
+  }
+}
+
+// ===== Auto Save Report to Backend =====
+async function autoSaveReport(problem, markdown) {
+  try {
+    const report = {
+      id: Date.now().toString(),
+      problem: problem,
+      domainId: '_ai',
+      date: new Date().toLocaleString('zh-CN'),
+      starred: false,
+      goldenCause: 'AI分析生成',
+      contradiction: '详见AI分析报告',
+      opportunities: ['机会1', '机会2', '机会3'],
+      markdown: markdown || ''
+    };
+    await apiPost('/reports', report);
+  } catch (e) {
+    console.error('Auto-save report failed:', e);
   }
 }
 
@@ -727,36 +709,50 @@ async function viewReport(id) {
   if (!data.success) return;
   const r = data.report;
 
-  // Store current report info for save-to-Notion
+  // Store current report info for save-to-Notion and star
   window._currentReportMarkdown = r.markdown || r.problem;
   window._currentReportTitle = r.problem;
   window._currentReportId = r.id;
+  window._currentReportStarred = r.starred;
+
+  // Update star button state
+  updateStarButton(r.starred);
 
   // Render the markdown in modal
   const displayHtml = r.markdown ? formatMarkdown(r.markdown) : escapeHtml(r.problem);
-  // Prepend star button header
   const headerHtml = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #eee;">
       <h3 style="flex:1;margin:0;font-size:16px;">📊 ${escapeHtml(r.problem)}</h3>
-      <button class="star-btn ${r.starred ? 'starred' : ''}" style="font-size:24px;" onclick="event.stopPropagation(); toggleFromModal('${r.id}', ${r.starred})">
-        ${r.starred ? '⭐' : '☆'}
-      </button>
     </div>
     <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">${r.date}</div>
   `;
   openModal(headerHtml + displayHtml);
 }
 
-// ===== Toggle star from report modal =====
-async function toggleFromModal(id, currentlyStarred) {
-  // Optimistic UI
-  const newStar = !currentlyStarred;
-  const starBtn = document.querySelector('.star-btn');
-  if (starBtn) {
-    starBtn.textContent = newStar ? '⭐' : '☆';
-    starBtn.className = 'star-btn' + (newStar ? ' starred' : '');
-    starBtn.setAttribute('onclick', `event.stopPropagation(); toggleFromModal('${id}', ${newStar})`);
+// ===== Update star button UI =====
+function updateStarButton(starred) {
+  const btn = document.getElementById('starReportBtn');
+  if (btn) {
+    btn.textContent = starred ? '⭐ 收藏' : '☆ 收藏';
+    btn.style.color = starred ? '#f1c40f' : '';
   }
+}
+
+// ===== Toggle star for current report in modal =====
+async function toggleStarCurrent() {
+  const id = window._currentReportId;
+  if (!id) {
+    // Current analysis not yet saved - save it first then star
+    alert('请先保存到历史记录后再收藏');
+    return;
+  }
+  const currentlyStarred = window._currentReportStarred || false;
+  const newStar = !currentlyStarred;
+
+  // Optimistic UI
+  updateStarButton(newStar);
+  window._currentReportStarred = newStar;
+
   await apiPatch('/reports/' + id + '/star');
 }
 
@@ -799,6 +795,10 @@ function escapeHtml(text) {
 function openModal(html) {
   document.getElementById('modalBody').innerHTML = html;
   document.getElementById('reportModal').classList.add('active');
+  // Reset star button for new analysis (not from history)
+  if (!window._currentReportId) {
+    updateStarButton(false);
+  }
 }
 function closeModal(e) {
   if (e.target === document.getElementById('reportModal')) {
@@ -807,6 +807,9 @@ function closeModal(e) {
 }
 function closeModalDirect() {
   document.getElementById('reportModal').classList.remove('active');
+  // Clear current report id when closing modal
+  window._currentReportId = null;
+  window._currentReportStarred = false;
 }
 function copyReport() {
   const text = document.getElementById('modalBody').innerText;
