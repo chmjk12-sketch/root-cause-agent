@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from models import AnalyzeRequest, SaveToNotionRequest, HealthResponse
@@ -36,7 +36,11 @@ async def index():
     if not os.path.exists(html_path):
         html_path = os.path.join(STATIC_DIR, 'index.html')
     if os.path.exists(html_path):
-        return FileResponse(html_path)
+        return FileResponse(html_path, media_type='text/html', headers={
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+        })
     return {"message": "Backend API is running. Place the frontend HTML in the static/ directory.", "docs": "/docs"}
 
 
