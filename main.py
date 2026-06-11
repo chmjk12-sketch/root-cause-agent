@@ -5,12 +5,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse, JSONResponse, FileResponse, HTMLResponse
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from models import AnalyzeRequest, SaveToNotionRequest, HealthResponse
 from ai_service import stream_analysis
 from notion_service import save_report_to_notion
+import reports
 
 app = FastAPI(title="Root Cause Analysis Agent API", version="1.0.0")
 
@@ -36,11 +37,7 @@ async def index():
     if not os.path.exists(html_path):
         html_path = os.path.join(STATIC_DIR, 'index.html')
     if os.path.exists(html_path):
-        return FileResponse(html_path, media_type='text/html', headers={
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-        })
+        return FileResponse(html_path)
     return {"message": "Backend API is running. Place the frontend HTML in the static/ directory.", "docs": "/docs"}
 
 
@@ -82,6 +79,49 @@ async def save_to_notion(req: SaveToNotionRequest):
         return JSONResponse(status_code=400, content={"success": False, "error": "Title and content cannot be empty"})
     result = save_report_to_notion(req.title, req.markdown)
     return result
+
+
+# ===== Reports CRUD API =====
+
+@app.get("/reports")
+async def list_reports():
+    return {"success": True, "reports": reports.get_all()}
+
+
+@app.get("/reports/{report_id}")
+async def get_report(report_id: str):
+    r = reports.get_one(report_id)
+    if not r:
+        return JSONResponse(status_code=404, content={"success": False, "error": "Report not found"})
+    return {"success": True, "report": r}
+
+
+@app.post("/reports")
+async def create_report(body: dict):
+    report = reports.create(body)
+    return {"success": True, "report": report}
+
+
+@app.patch("/reports/{report_id}/star")
+async def star_report(report_id: str):
+    r = reports.toggle_star(report_id)
+    if not r:
+        return JSONResponse(status_code=404, content={"success": False, "error": "Report not found"})
+    return {"success": True, "report": r}
+
+
+@app.delete("/reports/{report_id}")
+async def delete_report(report_id: str):
+    ok = reports.delete(report_id)
+    if not ok:
+        return JSONResponse(status_code=404, content={"success": False, "error": "Report not found"})
+    return {"success": True}
+
+
+@app.delete("/reports")
+async def clear_reports():
+    reports.clear_all()
+    return {"success": True}
 
 
 if __name__ == "__main__":

@@ -335,8 +335,25 @@
     </div>
   </div>
 
+  <!-- API Config Toggle -->
+  <div class="api-toggle" onclick="toggleApi()">
+    <span>🔑 AI深度分析配置（可选）</span>
+    <span class="arrow" id="apiArrow">▼</span>
+  </div>
+  <div class="api-panel" id="apiPanel">
+    <input type="text" id="apiKey" value="sk-fb4dd8f653554df493de59cdcd530304" placeholder="API Key">
+    <input type="text" id="apiBase" value="https://api.deepseek.com/v1" placeholder="API Base URL">
+    <select id="modelSelect">
+      <option value="deepseek-chat" selected>DeepSeek Chat</option>
+      <option value="gpt-4o">GPT-4o</option>
+      <option value="gpt-4o-mini">GPT-4o Mini</option>
+      <option value="qwen-plus">通义千问 Plus</option>
+      <option value="qwen-turbo">通义千问 Turbo</option>
+    </select>
+  </div>
 </div>
-<!-- Result Page -->
+
+  <!-- Result Page -->
   <div class="page" id="pageResult">
     <div class="section-title">
       <div class="dot" style="background: var(--green);"></div>
@@ -344,7 +361,7 @@
     </div>
     <div style="padding: 16px; text-align: center; color: var(--text2);">
       <p style="font-size: 14px; line-height: 1.6;">分析结果将在弹窗中显示。</p>
-      <p style="font-size: 13px; margin-top: 8px;">分析完成后可点击"📝 保存到 Notion"留存报告。</p>
+      <p style="font-size: 13px; margin-top: 8px;">分析完成后可点击"保存到历史记录"留存报告。</p>
     </div>
   </div>
 
@@ -391,9 +408,8 @@
       <span class="modal-close" onclick="closeModalDirect()">&times;</span>
     </div>
     <div class="modal-body" id="modalBody"></div>
-    <div class="modal-footer" style="display:flex;gap:8px;">
-      <button class="btn btn-secondary" style="flex:1;" onclick="copyReport()">复制报告</button>
-      <button class="btn btn-primary" style="flex:1;" id="saveToNotionBtn" onclick="saveToNotion()">📝 保存到 Notion</button>
+    <div class="modal-footer">
+      <button class="btn btn-primary" style="width:100%;" onclick="copyReport()">复制报告</button>
     </div>
   </div>
 </div>
@@ -419,56 +435,50 @@
 let currentProblem = '';
 let currentPage = 'home';
 
-// ===== localStorage Helpers =====
-const STORAGE_KEY = 'rootcause_reports';
-let storageAvailable = false;
-try {
-  const test = '__test__';
-  localStorage.setItem(test, test);
-  localStorage.removeItem(test);
-  storageAvailable = true;
-} catch(e) {
-  console.warn('localStorage不可用，历史记录将无法保存');
+// ===== Reports API (backend SQLite) =====
+const API_BASE = (window._rcBackendUrl || '').replace(/\/+$/, '');
+
+async function apiFetch(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const r = await fetch(API_BASE + path, opts);
+  return r.json();
 }
-function getReports() {
-  if (!storageAvailable) return [];
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch(e) { return []; }
+function apiGet(path) { return apiFetch('GET', path); }
+function apiPost(path, body) { return apiFetch('POST', path, body); }
+function apiPatch(path) { return apiFetch('PATCH', path); }
+function apiDel(path) { return apiFetch('DELETE', path); }
+
+let _cachedReports = [];
+
+async function refreshReports() {
+  const data = await apiGet('/reports');
+  _cachedReports = (data.reports || []);
+  return _cachedReports;
 }
-function saveReports(reports) {
-  if (!storageAvailable) { console.warn('localStorage不可用，无法保存'); return; }
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(reports)); } catch(e) {
-    console.error('保存失败:', e);
-    alert('保存失败：存储空间可能已满');
-  }
+
+async function deleteReport(id) {
+  await apiDel('/reports/' + id);
+  await renderHistory();
+  await renderStarred();
 }
-function addReport(report) {
-  const reports = getReports();
-  reports.unshift(report);
-  saveReports(reports);
+
+async function toggleStar(id) {
+  await apiPatch('/reports/' + id + '/star');
+  await renderHistory();
+  await renderStarred();
 }
-function deleteReport(id) {
-  const reports = getReports().filter(r => r.id !== id);
-  saveReports(reports);
-  renderHistory();
-  renderStarred();
-}
-function toggleStar(id) {
-  const reports = getReports();
-  const r = reports.find(x => x.id === id);
-  if (r) { r.starred = !r.starred; saveReports(reports); }
-  renderHistory();
-  renderStarred();
-}
-function clearAllHistory() {
+
+async function clearAllHistory() {
   if (confirm('确定清空所有历史报告吗？')) {
-    saveReports([]);
-    renderHistory();
-    renderStarred();
+    await apiDel('/reports');
+    await renderHistory();
+    await renderStarred();
   }
 }
 
 // ===== Page Navigation =====
-function switchPage(page) {
+async function switchPage(page) {
   currentPage = page;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -482,12 +492,18 @@ function switchPage(page) {
   } else if (page === 'history') {
     document.getElementById('pageHistory').classList.add('active');
     document.getElementById('navHistory').classList.add('active');
-    renderHistory();
+    await renderHistory();
   } else if (page === 'starred') {
     document.getElementById('pageStarred').classList.add('active');
     document.getElementById('navStarred').classList.add('active');
-    renderStarred();
+    await renderStarred();
   }
+}
+
+// ===== Toggle API Panel =====
+function toggleApi() {
+  document.getElementById('apiPanel').classList.toggle('open');
+  document.querySelector('.api-toggle').classList.toggle('open');
 }
 
 // ===== Load Example =====
@@ -509,127 +525,113 @@ function loadExample() {
 async function startAnalysis() {
   const problem = document.getElementById('problemInput').value.trim();
   if (!problem) { alert('请输入商业痛点'); return; }
-  await startAiAnalysis(problem);
+
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) {
+    alert('请先配置 API Key 才能进行分析');
+    toggleApi();
+    return;
+  }
+  await startAiAnalysis(problem, apiKey);
 }
 
 // ===== AI Analysis =====
-async function startAiAnalysis(problem) {
+async function startAiAnalysis(problem, apiKey) {
   showLoading('正在进行AI深度分析...');
 
-  const backendUrl = (window._rcBackendUrl || '').replace(/\/+$/, '');
+  const model = document.getElementById('modelSelect').value;
+  const base = document.getElementById('apiBase').value.trim() || 'https://api.openai.com/v1';
 
   try {
-    openModal('<div class="loading"><div class="loading-spinner"></div><p>AI分析中...</p></div>');
-    hideLoading();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const response = await fetch(backendUrl + '/analyze', {
+    const response = await fetch(base.replace(/\/+$/, '') + '/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ problem })
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: '请分析以下商业痛点：\n\n' + problem }
+        ],
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 4096,
+      }),
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || '分析请求失败 (' + response.status + ')');
+      const errText = await response.text().catch(() => '');
+      throw new Error('API请求失败 (' + response.status + '): ' + errText);
     }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = '';
     let fullText = '';
-    const modalBody = document.getElementById('modalBody');
+
+    hideLoading();
+    openModal('<div class="loading"><div class="loading-spinner"></div><p>AI分析中...</p></div>');
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
+      const text = decoder.decode(value, { stream: true });
+      const lines = text.split('\n');
       for (const line of lines) {
         const trimmed = line.trim();
-        if (trimmed.startsWith('data:')) {
-          try {
-            const data = JSON.parse(trimmed.slice(5).trim());
-            if (data.delta) {
-              fullText += data.delta;
-              modalBody.innerHTML = formatMarkdown(fullText);
-              modalBody.scrollTop = modalBody.scrollHeight;
-            }
-          } catch(e) { /* ignore parse errors */ }
-        }
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+        const data = trimmed.slice(5).trim();
+        if (data === '[DONE]') continue;
+        try {
+          const json = JSON.parse(data);
+          const delta = json.choices?.[0]?.delta?.content;
+          if (delta) { fullText += delta; document.getElementById('modalBody').innerHTML = formatMarkdown(fullText); }
+        } catch(e) {}
       }
     }
 
-    // Save full report for Notion save
-    window._currentReportMarkdown = fullText;
-    window._currentReportTitle = problem;
+    document.getElementById('modalBody').innerHTML = formatMarkdown(fullText);
 
   } catch (err) {
     hideLoading();
     if (err.name === 'AbortError') {
-      alert('AI分析超时：请求超时未响应\n\n请检查网络连接或稍后重试。');
+      alert('AI分析超时：请求超过30秒未响应\n\n请检查网络连接或稍后重试。');
     } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-      alert('网络请求失败：\n\n1. 请检查后端服务是否运行\n2. 请检查后端地址配置是否正确');
+      alert('网络请求失败：\n\n1. 请检查网络连接\n2. 如果使用手机预览，请确保允许网络访问\n3. 或尝试在浏览器中直接打开此文件');
     } else {
-      alert('AI分析失败：' + err.message);
+      alert('AI分析失败：' + err.message + '\n\n请检查 API Key 和网络连接后重试。');
     }
   }
 }
 
-// ===== Save to Notion =====
-async function saveToNotion() {
-  const markdown = window._currentReportMarkdown;
-  const title = window._currentReportTitle;
-  const backendUrl = (window._rcBackendUrl || '').replace(/\/+$/, '');
+// ===== Save Report =====
+async function saveCurrentReport() {
+  if (!currentProblem) { alert('请先进行分析'); return; }
 
-  if (!markdown) {
-    alert('请先进行分析');
-    return;
+  const report = {
+    id: Date.now().toString(),
+    problem: currentProblem,
+    domainId: '_ai',
+    date: new Date().toLocaleString('zh-CN'),
+    starred: false,
+    goldenCause: 'AI分析生成',
+    contradiction: '详见AI分析报告',
+    opportunities: ['机会1', '机会2']
+  };
+  const result = await apiPost('/reports', report);
+  if (!result.success) { alert('保存失败'); return; }
+  if (confirm('报告已保存！是否立即查看历史记录？')) {
+    switchPage('history');
   }
-
-  const now = new Date();
-  const dateStr = now.toLocaleString('zh-CN', { hour12: false });
-  const notionTitle = (title || '根因分析报告') + ' - ' + dateStr;
-
-  const btn = document.getElementById('saveToNotionBtn');
-  const origText = btn ? btn.textContent : '';
-  if (btn) { btn.textContent = '⏳ 保存中...'; btn.disabled = true; }
-
-  try {
-    const response = await fetch(backendUrl + '/save-to-notion', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: notionTitle, markdown })
-    });
-
-    const result = await response.json();
-
-    if (result.success) {
-      if (btn) btn.textContent = '✅ 已保存';
-      setTimeout(function() {
-        if (btn) { btn.textContent = origText; btn.disabled = false; }
-      }, 2000);
-    } else {
-      if (btn) { btn.textContent = origText; btn.disabled = false; }
-      alert('❌ 保存失败：' + (result.error || '未知错误'));
-    }
-  } catch (err) {
-    if (btn) { btn.textContent = origText; btn.disabled = false; }
-    alert('❌ 网络错误：' + err.message);
-  }
-}
-
-// Legacy - Save Report (now uses Notion)
-function saveCurrentReport() {
-  if (!window._currentReportMarkdown) { alert('请先进行分析'); return; }
-  saveToNotion();
 }
 
 // ===== Render History =====
-function renderHistory() {
-  const reports = getReports();
+async function renderHistory() {
+  const reports = await refreshReports();
   const list = document.getElementById('historyList');
   const empty = document.getElementById('historyEmpty');
 
@@ -658,7 +660,7 @@ function renderHistory() {
       <div class="history-preview">
         🔑 黄金根因：${escapeHtml(r.goldenCause)}<br>
         ⚡ 矛盾参数：${escapeHtml(r.contradiction)}<br>
-        🚀 机会数：${r.opportunities.length}
+        🚀 机会数：${Array.isArray(r.opportunities) ? r.opportunities.length : 0}
       </div>
       <div class="history-actions">
         <button class="btn btn-secondary" onclick="viewReport('${r.id}')">查看</button>
@@ -671,8 +673,9 @@ function renderHistory() {
 }
 
 // ===== Render Starred =====
-function renderStarred() {
-  const reports = getReports().filter(r => r.starred);
+async function renderStarred() {
+  const all = await refreshReports();
+  const reports = all.filter(r => r.starred);
   const list = document.getElementById('starredList');
   const empty = document.getElementById('starredEmpty');
 
@@ -712,23 +715,24 @@ function renderStarred() {
 }
 
 // ===== View Report =====
-function viewReport(id) {
-  const r = getReports().find(x => x.id === id);
-  if (!r) return;
+async function viewReport(id) {
+  const data = await apiGet('/reports/' + id);
+  if (!data.success) return;
   alert('该报告为历史版本保存的数据。请返回首页重新输入问题，使用AI深度分析获取最新结果。');
 }
 
 // ===== Export History Report =====
-function exportHistoryReport(id) {
-  const r = getReports().find(x => x.id === id);
-  if (!r) return;
+async function exportHistoryReport(id) {
+  const data = await apiGet('/reports/' + id);
+  if (!data.success) return;
+  const r = data.report;
 
   let report = `📊 根因分析报告\n\n`;
   report += `问题：${r.problem}\n`;
   report += `时间：${r.date}\n`;
   report += `黄金根因：${r.goldenCause}\n`;
   report += `矛盾参数：${r.contradiction}\n`;
-  report += `机会数：${r.opportunities.length}\n\n`;
+  report += `机会数：${Array.isArray(r.opportunities) ? r.opportunities.length : 0}\n\n`;
   report += `⚠️ 注意：本报告为历史摘要，完整分析请使用AI深度分析功能重新生成。\n`;
 
   const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
@@ -767,31 +771,7 @@ function closeModalDirect() {
 }
 function copyReport() {
   const text = document.getElementById('modalBody').innerText;
-  try {
-    navigator.clipboard.writeText(text).then(function() {
-      alert('✅ 已复制到剪贴板');
-    }).catch(function() {
-      fallbackCopy(text);
-    });
-  } catch(e) {
-    fallbackCopy(text);
-  }
-}
-
-function fallbackCopy(text) {
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed';
-  ta.style.left = '-9999px';
-  document.body.appendChild(ta);
-  ta.select();
-  try {
-    document.execCommand('copy');
-    alert('✅ 已复制到剪贴板');
-  } catch(e) {
-    alert('❌ 复制失败，请手动选择文字后复制');
-  }
-  document.body.removeChild(ta);
+  navigator.clipboard.writeText(text).then(() => alert('已复制到剪贴板'));
 }
 
 // ===== Loading =====
@@ -866,19 +846,112 @@ function formatSimpleMarkdown(text) {
 }
 
 // ===== System Prompt =====
-// SYSTEM_PROMPT has been moved to the backend server for security.
-// It is loaded from system_prompt.txt on the server.
+const SYSTEM_PROMPT = `你是一个极其锐利的【商业机会挖掘与跨界创新引擎】。你的理论母体是管理学中魏泽龙教授的《创业机会创造与评估》、避免"问题解决陷阱"理论、TRIZ（发明问题解决理论）矛盾矩阵以及 FOS（Function-Oriented Search，面向功能的检索）方法论。
+
+## Mission
+你的核心任务是：拒绝任何平庸的、属于企业日常运营层面的"打补丁修补建议"（如加强培训、降低定价、多做营销）。你必须像剥洋葱一样，对用户输入的商业痛点连续进行 3 层因果链下挖，利用【相关度】与【可控度】在后台自主完成动态剪枝。接着，将最核心的行业底层死结转化为【TRIZ 技术矛盾模型】，通过标准矛盾矩阵查表锁定【标准发明原理】，再通过 FOS 跨界功能抽象与领先行业映射，最终输出 4 个能颠覆行业的"降维打击型创业机会"。
+
+## Workflow Logic (后台核心推演逻辑)
+
+### Step 1: 第一层因果穷举 (Layer-1 Causes)
+针对初始问题，从"市场/体制"、"产品/技术"、"用户/人合"三个通用商业框架维度，穷举出 3 个相互独立的潜在原因（记为原因 1.1, 1.2, 1.3）。
+
+### Step 2: 声明式通用评估与动态剪枝 (Evaluation & Pruning)
+严格使用以下两个死固定的元维度，对第一层的 3 个原因进行内部打分（0.0 到 1.0）：
+1. 相关度 (Relevance)：该原因是否是导致上层结果的实质性真因？（0.0=只是表面症状，1.0=必然的铁证因果）。
+2. 可控度 (Actionability)：注意！这里的可控指"是否能作为【创业公司】通过产品架构创新、技术平替、模式颠覆或流程裁剪来降维打击的范畴"。
+   - 负向指标（打低分）：属于国家宏观政策、不可逆转的社会大趋势、无法动摇的垄断体制。此类节点直接剪枝丢弃！
+   - 正向指标（打高分）：属于"由于多方利益冲突导致的效率妥协"、"底层核心技术参数之间的相互制约"。这说明存在潜在的 TRIZ 矛盾。
+3. 剪枝决策：计算综合分 = (相关度 * 0.5) + (可控度 * 0.5)。只保留综合评分最高的一个核心原因，将其作为"黄金节点"继续向下挖掘，其余分支全部砍掉（剪枝）。
+
+### Step 3: 连续向下递归至第 2 层与第 3 层 (Recursive Deep-Dive)
+针对 Step 2 筛选出的"黄金节点"，连续在后台追问两次"为什么（Why）"，一路下挖到第 2 层原因和第 3层原因，直到触及该行业或该技术最底层的【极限原因/物理或制度限制】。
+
+### Step 4: TRIZ 矛盾矩阵破局与 FOS 跨界传导 (Matrix & FOS Bridge)
+1. **技术矛盾建模**：将第 3 层的极限根因，转化为 TRIZ 标准技术矛盾。从 TRIZ 39 个通用工程参数中精准锁定 1 个【欲改善的特性】和 1 个由于系统折衷而【恶化的特性】。
+2. **矛盾矩阵查表定位**：在后台模拟/检索 TRIZ 矛盾矩阵，找出交点推荐的 1-2 个核心【发明原理】（从 40 个标准发明原理中锁定，如分割、逆向思维、动态化、相变、非对称等），作为攻克该死结的"核心解题动作"。
+3. **FOS（面向功能检索）传导抽象**：利用"N型创新模式"，将上述【发明原理】赋予的解题动作，与当前行业的具体业务词汇剥离，翻译为通用的【标准功能语言（Subject + Action + Object，主+谓+宾）】。
+4. **领先领域（Lead Domain）定向检索**：根据 FOS 原则，锁定 3 个与当前行业毫无关联、但满足以下四个硬性指标的【领先行业】：
+   - 该通用功能在此领域属于生死攸关的关键问题；
+   - 该功能在更严苛、更极端的环境下被成功实现过；
+   - 该领域已投入了巨大的人力、物力、财力来解决此问题；
+   - 该领域在该功能上沉淀了不止一种成熟的技术或商业方案。
+
+### Step 5: 降维打击型创业机会评估输出 (Cross-Industry Output)
+将 Step 4 中领先行业的跨界成果作为"资源与链接扩展型机会"，嫁接移植回当前用户的初始场景。结合 TRIZ 分离原理（时间/空间/系统级别分离），必须输出 3 个能够打破行业既定妥协、让用户惊喜的硬核产品/商业模式路线机会（每个机会必须与上述 FOS 领先行业一一对应）。
+
+## Output Format Requirements (严格结构化输出)
+
+为了适配前端 UI，请不要输出任何多余的寒暄、解释和碎碎念。必须严格按照以下 Markdown 格式进行输出（支持转化为 JSON 格式）：
+
+### 📊 1. 行业边界与多维覆盖
+[输出当前场景所属的商业分析框架，并指出哪个维度是最具可挖掘价值的黄金破局点]
+- **市场环境层**：[已覆盖/已过滤]
+- **用户价值层**：[已覆盖/已过滤]
+- **产品/技术层**：[已覆盖/核心黄金挖掘点]
+- **战略定位层**：[已覆盖/已过滤]
+
+### 🌲 2. 逐层因果递归图谱 (自动剪枝结果)
+[用树状图清晰展示系统在后台自动连续下挖 3 层的逻辑链条，并注明被剪枝的分支]
+
+📍 初始痛点：{{问题}}
+ ├── ❌ 原因 1.1：[填入原因] (综合分: X.X -> 原因：[写明剪枝理由])
+ ├── ❌ 原因 1.2：[填入原因] (综合分: X.X -> 原因：[写明剪枝理由])
+ └── 🟡 黄金节点：原因 1.3：[填入综合得分最高的核心根因] (综合分: X.X -> 核心商业创新机会，继续深挖)
+      └── 🛑 第二层深挖：[针对原因1.3继续问Why的结论]
+           └── 🚨 第三层极限根因：[触及底层的体制、技术、物理冲突极限]
+
+### 🚨 3. 底层 TRIZ 矛盾矩阵破局
+[将行业里大家都在默认妥协的潜规则，精准翻译为硬核的 TRIZ 技术矛盾参数与解法模型]
+
+- **技术矛盾映射**：
+  - **📈 欲改善的通用参数**：[从 39 个通用工程参数中选择精确名称]
+  - **📉 随之恶化的通用参数**：[从 39 个通用工程参数中选择精确名称]
+- **🔮 矛盾矩阵推荐解法（发明原理）**：[从 40 个发明原理中锁定 1-2 个，写明序号与名称，如：No.15 动态化原理]，作为系统改动的核心指针。
+
+### 🔍 4. FOS（面向功能检索）跨界映射桥梁
+[展示通过发明原理指导，进行去行业化抽象并"借手术刀"的完整传导过程]
+
+- **去行业化通用功能抽象（主 + 谓【由上述发明原理演化】 + 宾）**：[例如：利用动态反馈机制（谓语）修正未知复杂主体的自主状态（宾语）]
+- **FOS 跨界领先领域筛选**：
+  1. **🎯 领先行业 A**：\`[行业名称]\` -> 严苛场景：\`[该行业在何种极端条件下处理此功能]\` -> 目前最成熟的技术路线/模式：\`[核心技术/模式]\`。
+  2. **🎯 领先行业 B**：\`[行业名称]\` -> 严苛场景：\`[该行业在何种极端条件下处理此功能]\` -> 目前最成熟的技术路线/模式：\`[核心技术/模式]\`。
+  3. **🎯 领先行业 C**：\`[行业名称]\` -> 严苛场景：\`[该行业在何种极端条件下处理此功能]\` -> 目前最成熟的技术路线/模式：\`[核心技术/模式]\`。
+
+### 💡 5. 跨界嫁接型创业机会评估（打破妥协的惊喜产品）
+[基于上述 FOS 跨界成果，利用 TRIZ 创新原理，给出 3 个能够让创业公司弯道超车的硬核产品路线机会。每个机会必须与上述 FOS 领先行业一一对应。拒绝平庸方案！]
+
+#### 🚀 创业机会 1：[机会名称]（对应领先行业 A）
+- **🔗 FOS 对应来源**：领先行业 A —— \`[行业名称]\`
+- **👨‍💻 细分客户画像**：[明确 2B/2C/2G 典型客户特征与购买力评估]
+- **🎬 场景痛点共情**：[描述客户在此具体场景下的隐性矛盾与高频痛点]
+- **⚖️ 现有方案弊端**：[指出目前市面上竞争对手或替代方案无法解决该矛盾的根本原因]
+- **🛠️ 跨界颠覆性解法**：[详细阐述如何将领先行业 A 的成熟方案，在上述【发明原理】和【TRIZ 分离原理】指导下完美移植回当前场景。如何不搞折中，既满足欲改善参数，又解决恶化参数，创造让用户惊喜的产品]。
+- **⚠️ 核心合规红线提示**：[指出该创业机会在当前行业落地时，必须注意的政策、法律或行业既定红线，确保方案具备真正的落地可执行性]。
+
+#### 🚀 创业机会 2：[机会名称]（对应领先行业 B）
+- **🔗 FOS 对应来源**：领先行业 B —— \`[行业名称]\`
+- **👨‍💻 细分客户画像**：[详细阐述]
+- **🎬 场景痛点共情**：[详细阐述]
+- **⚖️ 现有方案弊端**：[详细阐述]
+- **🛠️ 跨界颠覆性解法**：[详细阐述如何将领先行业 B 的成熟方案移植回当前场景]
+- **⚠️ 核心合规红线提示**：[详细阐述]
+
+#### 🚀 创业机会 3：[机会名称]（对应领先行业 C）
+- **🔗 FOS 对应来源**：领先行业 C —— \`[行业名称]\`
+- **👨‍💻 细分客户画像**：[详细阐述]
+- **🎬 场景痛点共情**：[详细阐述]
+- **⚖️ 现有方案弊端**：[详细阐述]
+- **🛠️ 跨界颠覆性解法**：[详细阐述如何将领先行业 C 的成熟方案移植回当前场景]
+- **⚠️ 核心合规红线提示**：[详细阐述]`;
 
 
 
 // Init
-document.addEventListener('DOMContentLoaded', function() {
-  if (!storageAvailable) {
-    console.warn('localStorage不可用，历史记录功能已禁用');
-  }
-  // 页面加载时预渲染历史记录（即使当前不在历史页面）
-  renderHistory();
-  renderStarred();
+document.addEventListener('DOMContentLoaded', async function() {
+  // 页面加载时预渲染历史记录
+  await renderHistory();
+  await renderStarred();
 });
 </script>
 </body>
