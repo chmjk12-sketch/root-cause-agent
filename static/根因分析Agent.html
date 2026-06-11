@@ -408,8 +408,9 @@
       <span class="modal-close" onclick="closeModalDirect()">&times;</span>
     </div>
     <div class="modal-body" id="modalBody"></div>
-    <div class="modal-footer">
-      <button class="btn btn-primary" style="width:100%;" onclick="copyReport()">复制报告</button>
+    <div class="modal-footer" style="display:flex;gap:8px;">
+      <button class="btn btn-secondary" style="flex:1;" onclick="copyReport()">复制报告</button>
+      <button class="btn btn-primary" style="flex:1;" id="saveToNotionBtn" onclick="saveToNotion()">📝 保存到 Notion</button>
     </div>
   </div>
 </div>
