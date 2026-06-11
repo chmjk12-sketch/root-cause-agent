@@ -767,7 +767,31 @@ function closeModalDirect() {
 }
 function copyReport() {
   const text = document.getElementById('modalBody').innerText;
-  navigator.clipboard.writeText(text).then(() => alert('已复制到剪贴板'));
+  try {
+    navigator.clipboard.writeText(text).then(function() {
+      alert('✅ 已复制到剪贴板');
+    }).catch(function() {
+      fallbackCopy(text);
+    });
+  } catch(e) {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    alert('✅ 已复制到剪贴板');
+  } catch(e) {
+    alert('❌ 复制失败，请手动选择文字后复制');
+  }
+  document.body.removeChild(ta);
 }
 
 // ===== Loading =====
