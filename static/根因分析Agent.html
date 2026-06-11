@@ -549,7 +549,8 @@ async function startAiAnalysis(problem) {
         if (data === '[DONE]') continue;
         try {
           const json = JSON.parse(data);
-          const delta = json.choices?.[0]?.delta?.content;
+          // Support both backend format {"delta": "..."} and OpenAI format {"choices": [{"delta": {"content": "..."}}]}
+          const delta = json.delta || json.choices?.[0]?.delta?.content;
           if (delta) { fullText += delta; document.getElementById('modalBody').innerHTML = formatMarkdown(fullText); }
         } catch(e) {}
       }
