@@ -786,18 +786,38 @@ async function exportHistoryReport(id) {
   const r = data.report;
 
   let report = `📊 根因分析报告\n\n`;
+  report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
   report += `问题：${r.problem}\n`;
   report += `时间：${r.date}\n`;
-  report += `黄金根因：${r.goldenCause}\n`;
-  report += `矛盾参数：${r.contradiction}\n`;
-  report += `机会数：${Array.isArray(r.opportunities) ? r.opportunities.length : 0}\n\n`;
-  report += `⚠️ 注意：本报告为历史摘要，完整分析请使用AI深度分析功能重新生成。\n`;
+  report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  // Include full markdown content if available
+  if (r.markdown && r.markdown.trim()) {
+    report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    report += `📋 完整分析报告\n`;
+    report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    report += r.markdown;
+    report += `\n\n`;
+  }
+
+  report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  report += `📌 摘要信息\n`;
+  report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  report += `黄金根因：${r.goldenCause || 'N/A'}\n`;
+  report += `矛盾参数：${r.contradiction || 'N/A'}\n`;
+  report += `机会数：${Array.isArray(r.opportunities) ? r.opportunities.length : 0}\n`;
+  if (Array.isArray(r.opportunities) && r.opportunities.length > 0) {
+    report += `\n机会列表：\n`;
+    r.opportunities.forEach((op, i) => {
+      report += `  ${i + 1}. ${op}\n`;
+    });
+  }
 
   const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `根因分析报告_${r.problem.slice(0,20)}_${new Date().getTime()}.txt`;
+  a.download = `根因分析报告_${r.problem.slice(0,20)}_${new Date().getTime()}.md`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
