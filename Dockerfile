@@ -1,4 +1,14 @@
-FROM nginx:alpine
-RUN echo 'server { listen 80; location / { root /usr/share/nginx/html; } location /health { return 200 "OK"; } }' > /etc/nginx/conf.d/default.conf
-COPY . /usr/share/nginx/html
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY *.py .
+COPY system_prompt.txt .
+COPY static/ static/
+
 EXPOSE 80
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
