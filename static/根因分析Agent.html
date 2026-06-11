@@ -597,6 +597,11 @@ async function startAiAnalysis(problem, apiKey) {
 
     document.getElementById('modalBody').innerHTML = formatMarkdown(fullText);
 
+    // Store for save-to-Notion
+    window._currentReportMarkdown = fullText;
+    window._currentReportTitle = currentProblem;
+    window._currentReportId = null; // 当前分析报告不存储到后端
+
   } catch (err) {
     hideLoading();
     if (err.name === 'AbortError') {
@@ -621,7 +626,8 @@ async function saveCurrentReport() {
     starred: false,
     goldenCause: 'AI分析生成',
     contradiction: '详见AI分析报告',
-    opportunities: ['机会1', '机会2']
+    opportunities: ['机会1', '机会2'],
+    markdown: window._currentReportMarkdown || ''
   };
   const result = await apiPost('/reports', report);
   if (!result.success) { alert('保存失败'); return; }
@@ -715,11 +721,43 @@ async function renderStarred() {
   });
 }
 
-// ===== View Report =====
+// ===== View Report (from history, opens full report modal) =====
 async function viewReport(id) {
   const data = await apiGet('/reports/' + id);
   if (!data.success) return;
-  alert('该报告为历史版本保存的数据。请返回首页重新输入问题，使用AI深度分析获取最新结果。');
+  const r = data.report;
+
+  // Store current report info for save-to-Notion
+  window._currentReportMarkdown = r.markdown || r.problem;
+  window._currentReportTitle = r.problem;
+  window._currentReportId = r.id;
+
+  // Render the markdown in modal
+  const displayHtml = r.markdown ? formatMarkdown(r.markdown) : escapeHtml(r.problem);
+  // Prepend star button header
+  const headerHtml = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #eee;">
+      <h3 style="flex:1;margin:0;font-size:16px;">📊 ${escapeHtml(r.problem)}</h3>
+      <button class="star-btn ${r.starred ? 'starred' : ''}" style="font-size:24px;" onclick="event.stopPropagation(); toggleFromModal('${r.id}', ${r.starred})">
+        ${r.starred ? '⭐' : '☆'}
+      </button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">${r.date}</div>
+  `;
+  openModal(headerHtml + displayHtml);
+}
+
+// ===== Toggle star from report modal =====
+async function toggleFromModal(id, currentlyStarred) {
+  // Optimistic UI
+  const newStar = !currentlyStarred;
+  const starBtn = document.querySelector('.star-btn');
+  if (starBtn) {
+    starBtn.textContent = newStar ? '⭐' : '☆';
+    starBtn.className = 'star-btn' + (newStar ? ' starred' : '');
+    starBtn.setAttribute('onclick', `event.stopPropagation(); toggleFromModal('${id}', ${newStar})`);
+  }
+  await apiPatch('/reports/' + id + '/star');
 }
 
 // ===== Export History Report =====
@@ -772,7 +810,69 @@ function closeModalDirect() {
 }
 function copyReport() {
   const text = document.getElementById('modalBody').innerText;
-  navigator.clipboard.writeText(text).then(() => alert('已复制到剪贴板'));
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => alert('✅ 已复制到剪贴板')).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    alert('✅ 已复制到剪贴板');
+  } catch(e) {
+    alert('❌ 复制失败，请手动长按选择文字后复制');
+  }
+  document.body.removeChild(ta);
+}
+
+// ===== Save to Notion =====
+async function saveToNotion() {
+  const markdown = window._currentReportMarkdown;
+  const title = window._currentReportTitle;
+  const backendUrl = (window._rcBackendUrl || '').replace(/\/+$/, '');
+
+  if (!markdown) {
+    alert('请先进行分析');
+    return;
+  }
+
+  const now = new Date();
+  const dateStr = now.toLocaleString('zh-CN', { hour12: false });
+  const notionTitle = (title || '根因分析报告') + ' - ' + dateStr;
+
+  const btn = document.getElementById('saveToNotionBtn');
+  const origText = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = '⏳ 保存中...'; btn.disabled = true; }
+
+  try {
+    const response = await fetch(backendUrl + '/save-to-notion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: notionTitle, markdown })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      if (btn) btn.textContent = '✅ 已保存';
+      setTimeout(function() {
+        if (btn) { btn.textContent = origText; btn.disabled = false; }
+      }, 2000);
+    } else {
+      if (btn) { btn.textContent = origText; btn.disabled = false; }
+      alert('❌ 保存失败：' + (result.error || '未知错误'));
+    }
+  } catch (err) {
+    if (btn) { btn.textContent = origText; btn.disabled = false; }
+    alert('❌ 网络错误：' + err.message);
+  }
 }
 
 // ===== Loading =====
