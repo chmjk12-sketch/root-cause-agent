@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from models import AnalyzeRequest, SaveToNotionRequest, HealthResponse
-from ai_service import stream_analysis
+from ai_service import stream_analysis, analyze_full
 from notion_service import save_report_to_notion
 import reports
 
@@ -83,6 +83,18 @@ async def analyze_full(req: AnalyzeRequest):
         event_stream(), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}
     )
+
+
+@app.post("/analyze-full-sync")
+async def analyze_full_sync(req: AnalyzeRequest):
+    """Synchronous endpoint: returns the full analysis as JSON (for mini program clients)"""
+    problem = req.problem.strip()
+    if not problem:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Please enter a business pain point"})
+    result = await analyze_full(problem, req.model)
+    if not result.get('success'):
+        return JSONResponse(status_code=500, content=result)
+    return result
 
 
 @app.post("/save-to-notion")

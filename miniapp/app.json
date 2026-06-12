@@ -1,0 +1,44 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/result/result",
+    "pages/history/history",
+    "pages/settings/settings"
+  ],
+  "window": {
+    "navigationBarTitleText": "根因分析Agent",
+    "navigationBarBackgroundColor": "#2979ff",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#e3f2fd",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#636e72",
+    "selectedColor": "#2979ff",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "分析",
+        "iconPath": "images/analysis.png",
+        "selectedIconPath": "images/analysis-active.png"
+      },
+      {
+        "pagePath": "pages/history/history",
+        "text": "历史",
+        "iconPath": "images/history.png",
+        "selectedIconPath": "images/history-active.png"
+      },
+      {
+        "pagePath": "pages/settings/settings",
+        "text": "设置",
+        "iconPath": "images/settings.png",
+        "selectedIconPath": "images/settings-active.png"
+      }
+    ]
+  },
+  "networkTimeout": {
+    "request": 60000
+  }
+}

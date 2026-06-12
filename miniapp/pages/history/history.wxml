@@ -1,0 +1,30 @@
+<view class="page">
+  <view class="list-header" wx:if="{{list.length > 0}}">
+    <text class="list-count">共 {{list.length}} 条记录</text>
+    <button class="btn-secondary clear-btn" bindtap="clearAll">清空</button>
+  </view>
+
+  <view class="empty-state" wx:if="{{list.length === 0}}">
+    <image class="empty-icon" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABhGlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw0AcxV9TpUUqDnYQcchQnSyIijhKFYtgobQVWnUwufQLmjQkKS6OgmvBwY/FqoOLs64OroIg+AHi5uak6CIl/i8ptIjx4Lgf7+497t4BQr3MNKtrAtB020wl4mImuyoGXxGFCAAMow8zM4xJSYrD83UdH9+9QzyF7mY+N4CX+Ffq2Pp4kH+QwvlAkV/iC0dFTBIvmAC/JvEnk78g/pz4h8m/SHwmSbxK4ksyf0n8JfG5xD+Tf5H4Q/Evif8k/pL4p8R/kvhPie+kfqLkGS2fV3JSybtK3IVce3VZmu0eX5O46+vWNvdpwh+YTaoBwQXwBwAASYFVAVQ3INq2YmKA5P9r4i+Jv2R+kuQvmp+hPqX+Bf0/lH6R/Jv0VyX+W/yL5F8l/pz4S5L/SvyixD+Sv0j8Jcl/pP5J8i9J/iXJH0n8kvh7iX8k/pPkXxL/SH5J4i9Jfi/5V4l/JvmVxJ+S/JLEL5JfkvhF4h9JfpL4L4l/JH5J/JLkn5L4Jcl/SvKvkvhLkl+S+EviX5L4S+JfkvhL4l+S+EviX5L4S+IviX9J4i+Jf0niL4l/SeIviX9J4i+Jf0niL4l/SeIviX9J4i+Jf0niL4l/SeIviX9J4i+Jf0niL4l/SeIviX9J4i+Jf0niL4l/SeIviX9J4i+Jf0niL4l/SeIviX9J4i+Jf0niL4l/SeIviX9J4i+Jf0niL4l/SeIviX9J4i+Jf0niL4l/SeIviX9J4i+Jf0niL4l/UvwlyQsA37UnAgAAAAlwSFlzAAAuIwAALiMBeKU/dgAAACZ0RVh0ZGVzY3JpcHRpb24Acm9vdCBjYXVzZSBhZ2VudCBlbXB0eSBzdGF0ZQes3M0AAAAASUVORK5CYII="></image>
+    <text>暂无分析记录</text>
+    <navigator url="/pages/index/index" class="btn-primary start-btn">开始分析</navigator>
+  </view>
+
+  <view class="history-list" wx:else>
+    <view class="history-item" wx:for="{{list}}" wx:key="id" bindtap="viewDetail" data-id="{{item.id}}" data-markdown="{{item.markdown}}">
+      <view class="item-main">
+        <text class="item-title text-ellipsis">{{item.title}}</text>
+        <text class="item-time">{{item.time}}</text>
+      </view>
+      <view class="item-actions">
+        <view class="star-btn {{item.starred ? 'starred' : ''}}" bindtap="toggleStar" data-id="{{item.id}}" catchtap>
+          <text wx:if="{{item.starred}}">★</text>
+          <text wx:else>☆</text>
+        </view>
+        <view class="del-btn" bindtap="deleteItem" data-id="{{item.id}}" catchtap>
+          <text>🗑</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

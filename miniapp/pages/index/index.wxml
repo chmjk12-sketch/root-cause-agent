@@ -1,0 +1,36 @@
+<view class="page">
+  <view class="header">
+    <text class="header-title">根因分析Agent</text>
+    <text class="header-desc">输入业务痛点，AI 帮你做根因分析</text>
+  </view>
+
+  <view class="card">
+    <textarea class="input-area" placeholder="描述你遇到的业务问题或痛点&#10;&#10;例如：&#10;- 用户留存率持续下降&#10;- 订单转化率低&#10;- 系统故障频发&#10;- 团队协作效率低下" maxlength="2000" bindinput="onInput" value="{{problem}}"></textarea>
+    <view class="input-count">{{problem.length}}/2000</view>
+    <button class="btn-primary {{analyzing ? 'btn-loading' : ''}}" disabled="{{analyzing || !problem.trim()}}" bindtap="startAnalysis">
+      <view class="btn-content" wx:if="{{!analyzing}}">
+        <text>开始分析</text>
+      </view>
+      <view class="btn-content" wx:else>
+        <view class="btn-spinner"></view>
+        <text>分析中...</text>
+      </view>
+    </button>
+  </view>
+
+  <view class="tips" wx:if="{{!analyzing && !problem}}">
+    <text class="tips-title">💡 使用建议</text>
+    <view class="tip-item">
+      <text class="tip-num">1</text>
+      <text class="tip-text">描述要具体，包含背景、现象、影响</text>
+    </view>
+    <view class="tip-item">
+      <text class="tip-num">2</text>
+      <text class="tip-text">分析约需 10-30 秒，请耐心等待</text>
+    </view>
+    <view class="tip-item">
+      <text class="tip-num">3</text>
+      <text class="tip-text">分析结果可收藏和导出</text>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,66 @@
+.page { padding-bottom: 40px; }
+
+.form-item {
+  margin-bottom: 12px;
+}
+.form-label {
+  font-size: 14px;
+  color: #2d3436;
+  font-weight: 500;
+  display: block;
+  margin-bottom: 6px;
+}
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #2d3436;
+  background: #fafafa;
+  box-sizing: border-box;
+}
+.form-tip {
+  font-size: 12px;
+  color: #b2bec3;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.save-btn {
+  margin-top: 8px;
+}
+
+.test-result {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+.test-result.success {
+  color: #00b894;
+  background: #e6f9f0;
+}
+.test-result.error {
+  color: #e74c3c;
+  background: #fde8e8;
+}
+
+.about-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.about-item:last-child {
+  border-bottom: none;
+}
+.about-label {
+  font-size: 14px;
+  color: #636e72;
+}
+.about-value {
+  font-size: 14px;
+  color: #2d3436;
+}

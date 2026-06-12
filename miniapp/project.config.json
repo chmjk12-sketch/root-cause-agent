@@ -1,0 +1,20 @@
+{
+  "description": "根因分析 Agent - 小程序版",
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "setting": {
+    "bundle": false,
+    "userConfirmedBundleSwitch": false,
+    "urlCheck": true,
+    "scopeDataCheck": false
+  },
+  "compileType": "miniprogram",
+  "libVersion": "3.7.2",
+  "linter": {
+    "eslint": false
+  },
+  "projectname": "根因分析Agent",
+  "condition": {}
+}

@@ -1,0 +1,118 @@
+page {
+  background-color: #e3f2fd;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+  color: #2d3436;
+  min-height: 100vh;
+}
+
+/* Card component */
+.card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Primary button */
+.btn-primary {
+  width: 100%;
+  padding: 14px 0;
+  border-radius: 10px;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #2979ff, #1565c0);
+  text-align: center;
+}
+
+.btn-primary:active {
+  opacity: 0.8;
+}
+
+.btn-primary[disabled] {
+  opacity: 0.5;
+}
+
+/* Secondary button */
+.btn-secondary {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  color: #636e72;
+  background: #f0f0f5;
+  text-align: center;
+}
+
+.btn-secondary:active {
+  background: #e8e8ed;
+}
+
+/* Text truncate */
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Section title */
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d3436;
+  margin-bottom: 8px;
+}
+
+/* Tag */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #2979ff;
+  background: #e3f2fd;
+}
+
+.tag-success {
+  color: #00b894;
+  background: #e6f9f0;
+}
+
+.tag-error {
+  color: #e74c3c;
+  background: #fde8e8;
+}
+
+/* Loading spinner */
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #2979ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60px 20px;
+}
+.empty-state text {
+  font-size: 14px;
+  color: #b2bec3;
+  margin-top: 12px;
+}
+
+/* Safe area bottom */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}

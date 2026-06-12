@@ -1,0 +1,27 @@
+<view class="page safe-bottom">
+  <view class="result-header">
+    <text class="result-title">{{title}}</text>
+    <text class="result-time">{{time}}</text>
+  </view>
+
+  <view class="card result-content">
+    <rich-text nodes="{{htmlContent}}" wx:if="{{htmlContent}}"></rich-text>
+    <view class="loading-placeholder" wx:else>
+      <view class="spinner"></view>
+      <text>加载中...</text>
+    </view>
+  </view>
+
+  <view class="action-bar">
+    <button class="action-btn" bindtap="saveToLocal">
+      <text>📥 保存到本地</text>
+    </button>
+    <button class="action-btn" bindtap="shareResult">
+      <text>📤 分享</text>
+    </button>
+  </view>
+
+  <view class="toast" wx:if="{{showToast}}">
+    <text>{{toastText}}</text>
+  </view>
+</view>
