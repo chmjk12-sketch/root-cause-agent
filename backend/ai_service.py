@@ -56,9 +56,12 @@ async def stream_analysis(problem: str, model: str = None) -> AsyncGenerator[str
 
 async def analyze_full(problem: str, model: str = None) -> dict:
     full_text = ''
-    async for chunk in stream_analysis(problem, model):
-        data = json.loads(chunk)
-        if 'error' in data:
-            return {'success': False, 'error': data['error']}
-        full_text += data.get('delta', '')
-    return {'success': True, 'report': {'markdown': full_text, 'title': problem}}
+    try:
+        async for chunk in stream_analysis(problem, model):
+            data = json.loads(chunk)
+            if 'error' in data:
+                return {'success': False, 'error': data['error']}
+            full_text += data.get('delta', '')
+        return {'success': True, 'report': {'markdown': full_text, 'title': problem}}
+    except Exception as e:
+        return {'success': False, 'error': f"{type(e).__name__}: {str(e)}"}

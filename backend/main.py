@@ -103,10 +103,18 @@ async def analyze_full_sync(req: AnalyzeRequest):
     problem = req.problem.strip()
     if not problem:
         return JSONResponse(status_code=400, content={"success": False, "error": "Please enter a business pain point"})
-    result = await analyze_full(problem, req.model)
-    if not result.get('success'):
-        return JSONResponse(status_code=500, content=result)
-    return result
+    try:
+        result = await analyze_full(problem, req.model)
+        if not result.get('success'):
+            return JSONResponse(status_code=500, content=result)
+        return result
+    except Exception as e:
+        import traceback
+        return JSONResponse(status_code=500, content={
+            "success": False,
+            "error": f"Internal error: {type(e).__name__}: {str(e)}",
+            "traceback": traceback.format_exc().split('\n')[-5:]
+        })
 
 
 @app.post("/save-to-notion")
