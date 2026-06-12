@@ -67,7 +67,7 @@ async def analyze(req: AnalyzeRequest):
 
 
 @app.post("/analyze-full")
-async def analyze_full(req: AnalyzeRequest):
+async def analyze_full_sse(req: AnalyzeRequest):
     problem = req.problem.strip()
     if not problem:
         return JSONResponse(status_code=400, content={"success": False, "error": "Please enter a business pain point"})
