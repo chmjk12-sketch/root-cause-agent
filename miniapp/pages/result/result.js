@@ -45,25 +45,20 @@ Page({
     title: '',
     time: '',
     markdown: '',
-    htmlContent: '',
-    showToast: false,
-    toastText: ''
+    htmlContent: ''
   },
 
-  onLoad(options) {
-    const markdown = decodeURIComponent(options.markdown || '')
-    const title = decodeURIComponent(options.title || '根因分析报告')
-    const now = new Date()
-    const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
-
-    const htmlContent = markdownToHtml(markdown)
-
-    this.setData({
-      title,
-      markdown,
-      htmlContent,
-      time: timeStr
-    })
+  onLoad() {
+    const result = getApp().globalData.currentResult
+    if (result) {
+      const htmlContent = markdownToHtml(result.markdown)
+      this.setData({
+        title: result.title || '根因分析报告',
+        markdown: result.markdown,
+        htmlContent,
+        time: result.time || new Date().toLocaleString('zh-CN')
+      })
+    }
   },
 
   saveToLocal() {
@@ -77,22 +72,17 @@ Page({
         starred: false
       })
       wx.setStorageSync('analysisHistory', history.slice(0, 100))
-      this.showToast('已保存到历史记录')
+      wx.showToast({ title: '已保存到历史记录', icon: 'success' })
     } catch (e) {
-      this.showToast('保存失败')
+      wx.showToast({ title: '保存失败', icon: 'none' })
     }
   },
 
   shareResult() {
     wx.shareFileMessage({
       filePath: this.data.markdown,
-      success: () => this.showToast('分享成功'),
-      fail: () => this.showToast('分享失败')
+      success: () => wx.showToast({ title: '分享成功', icon: 'success' }),
+      fail: () => wx.showToast({ title: '分享失败', icon: 'none' })
     })
-  },
-
-  showToast(text) {
-    this.setData({ showToast: true, toastText: text })
-    setTimeout(() => this.setData({ showToast: false }), 2000)
   }
 })

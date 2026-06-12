@@ -1,17 +1,20 @@
 <view class="page safe-bottom">
   <view class="card">
-    <text class="section-title">服务器配置</text>
-    <view class="form-item">
-      <text class="form-label">服务器地址</text>
-      <input class="form-input" placeholder="https://xxx-xxx.cloud.tencent.com" value="{{apiBaseUrl}}" bindinput="onApiBaseUrlInput" />
+    <text class="section-title">云托管配置</text>
+    <view class="info-row">
+      <text class="info-label">环境ID</text>
+      <text class="info-value selectable">prod-d4gdb3koxd4c6f555</text>
     </view>
-    <text class="form-tip">输入微信云托管的默认域名，不要带结尾斜杠</text>
-    <button class="btn-primary save-btn" bindtap="saveConfig">保存配置</button>
+    <view class="info-row">
+      <text class="info-label">服务名称</text>
+      <text class="info-value selectable">flask-1c4n</text>
+    </view>
+    <text class="form-tip">使用微信云托管内部通信，无需公网域名和备案</text>
   </view>
 
   <view class="card">
     <text class="section-title">连接测试</text>
-    <button class="btn-secondary" bindtap="testConnection" disabled="{{!apiBaseUrl}}">测试连接</button>
+    <button class="btn-secondary" bindtap="testConnection">测试后端连通性</button>
     <text class="test-result {{testResultType}}" wx:if="{{testResult}}">{{testResult}}</text>
   </view>
 
@@ -19,11 +22,11 @@
     <text class="section-title">关于</text>
     <view class="about-item">
       <text class="about-label">版本</text>
-      <text class="about-value">1.0.0</text>
+      <text class="about-value">1.0.0-cloud</text>
     </view>
     <view class="about-item">
-      <text class="about-label">后端服务</text>
-      <text class="about-value">{{statusText}}</text>
+      <text class="about-label">通信方式</text>
+      <text class="about-value">云托管内部通信</text>
     </view>
   </view>
 </view>

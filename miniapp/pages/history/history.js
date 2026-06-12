@@ -16,9 +16,12 @@ Page({
     const { id } = e.currentTarget.dataset
     const item = this.data.list.find(i => i.id === id)
     if (item) {
-      wx.navigateTo({
-        url: `/pages/result/result?markdown=${encodeURIComponent(item.markdown)}&title=${encodeURIComponent(item.title)}`
-      })
+      getApp().globalData.currentResult = {
+        markdown: item.markdown || '',
+        title: item.title || '根因分析报告',
+        time: item.time || ''
+      }
+      wx.navigateTo({ url: '/pages/result/result' })
     }
   },
 

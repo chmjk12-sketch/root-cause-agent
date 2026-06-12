@@ -20,6 +20,33 @@
   background: #fafafa;
   box-sizing: border-box;
 }
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.info-row:last-of-type {
+  border-bottom: none;
+}
+.info-label {
+  font-size: 14px;
+  color: #636e72;
+  flex-shrink: 0;
+  margin-right: 12px;
+}
+.info-value {
+  font-size: 13px;
+  color: #2d3436;
+  font-family: monospace;
+  text-align: right;
+  word-break: break-all;
+  max-width: 60%;
+}
+.selectable {
+  user-select: text;
+}
 .form-tip {
   font-size: 12px;
   color: #b2bec3;

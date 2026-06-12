@@ -19,12 +19,15 @@ Page({
 
     api.analyzeFullSync(problem)
       .then(res => {
-        console.log('Analysis result:', res)
         this.setData({ analyzing: false })
         if (res && res.success && res.report) {
-          wx.navigateTo({
-            url: `/pages/result/result?markdown=${encodeURIComponent(res.report.markdown)}&title=${encodeURIComponent(res.report.title || problem)}`
-          })
+          // 通过 globalData 传递数据，避免 URL 超长
+          getApp().globalData.currentResult = {
+            markdown: res.report.markdown || '',
+            title: res.report.title || problem,
+            time: new Date().toLocaleString('zh-CN')
+          }
+          wx.navigateTo({ url: '/pages/result/result' })
         } else {
           wx.showToast({ title: res.error || '分析失败', icon: 'none' })
         }
