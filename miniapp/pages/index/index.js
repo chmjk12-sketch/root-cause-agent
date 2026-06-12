@@ -1,4 +1,4 @@
-import api from '../../utils/api'
+var api = require('../../utils/api.js')
 
 Page({
   data: {

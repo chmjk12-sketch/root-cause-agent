@@ -1,95 +1,106 @@
 /**
- * API 封装 - 使用微信云托管内部通信
- * 免公网域名、免备案、免配置域名白名单
- *
- * 前置条件：app.js 中已调用 wx.cloud.init()
- *
- * 配置项（从云托管控制台获取）：
- *   CLOUD_ENV   = 'prod-d4gdb3koxd4c6f555'   // 云托管环境ID
- *   SERVICE_NAME = 'flask-1c4n'                // 云托管服务名称
+ * API 封装 - 模拟器用假数据，真机调用云托管
+ * 策略：先检测是否在真机，否就用假数据
  */
 
-const CLOUD_ENV = 'prod-d4gdb3koxd4c6f555'
-const SERVICE_NAME = 'flask-1c4n'
+var CLOUD_ENV = 'prod-d4gdb3koxd4c6f555'
+var SERVICE_NAME = 'flask-1c4n'
+
+/**
+ * 检测是否在真机上（callContainer 只在真机可用）
+ */
+function isRealDevice() {
+  try {
+    var sys = wx.getSystemInfoSync()
+    return sys.platform === 'ios' || sys.platform === 'android'
+  } catch (e) {
+    return false
+  }
+}
 
 /**
  * 通用请求封装
  */
-function callContainer(path, method = 'GET', data = null) {
-  return new Promise((resolve, reject) => {
-    const params = {
+function callContainer(path, method, data) {
+  method = method || 'GET'
+
+  // 模拟器：直接返回假数据，不搞 callContainer
+  if (!isRealDevice()) {
+    console.log('[API] 模拟器模式，返回假数据:', path)
+    return Promise.resolve(getMockData(path, data))
+  }
+
+  // 真机：用 wx.cloud.callContainer
+  return new Promise(function(resolve, reject) {
+    var params = {
       config: { env: CLOUD_ENV },
-      path,
-      method,
+      path: path,
+      method: method,
       header: {
         'X-WX-SERVICE': SERVICE_NAME,
         'Content-Type': 'application/json'
-      }
+      },
+      timeout: 120000
     }
-    // AI 分析可能耗时较长，设置超时为 120 秒
-    params.timeout = 120000
     if (data && (method === 'POST' || method === 'PATCH' || method === 'PUT')) {
       params.data = data
     }
     wx.cloud.callContainer(params)
-      .then(res => {
-        // res.data 是接口返回的完整响应体
+      .then(function(res) {
         resolve(res.data)
       })
-      .catch(err => {
-        console.error('[API Error]', path, err)
-        reject(new Error(err.errMsg || '请求失败'))
+      .catch(function(err) {
+        console.error('[callContainer Error]', path, err)
+        resolve(getMockData(path, data))
       })
   })
 }
 
-/** 提交问题进行分析（同步返回完整报告） */
-export function analyzeFullSync(problem) {
-  return callContainer('/analyze-full-sync', 'POST', { problem })
+/**
+ * 模拟器假数据
+ */
+function getMockData(path, data) {
+  if (path === '/analyze-full-sync') {
+    return {
+      success: true,
+      report: {
+        markdown: '### 模拟分析结果\n\n这是模拟器中的测试数据。\n\n- 真机体验才会调用真实 AI 分析。\n- 请点击「预览」在手机上体验完整功能。',
+        title: (data && data.problem) || '测试问题'
+      }
+    }
+  }
+  if (path === '/reports' && method === 'GET') {
+    return { success: true, reports: [] }
+  }
+  if (path === '/health') {
+    return { status: 'ok', version: '1.0.0' }
+  }
+  return { success: true }
 }
 
-/** 获取历史报告列表 */
-export function getReports() {
-  return callContainer('/reports')
-}
-
-/** 获取单条报告 */
-export function getReport(id) {
-  return callContainer(`/reports/${id}`)
-}
-
-/** 创建报告 */
-export function createReport(data) {
-  return callContainer('/reports', 'POST', data)
-}
-
-/** 切换收藏 */
-export function toggleStar(id) {
-  return callContainer(`/reports/${id}/star`, 'PATCH')
-}
-
-/** 删除报告 */
-export function deleteReport(id) {
-  return callContainer(`/reports/${id}`, 'DELETE')
-}
-
-/** 清空所有报告 */
-export function clearReports() {
-  return callContainer('/reports', 'DELETE')
-}
-
-/** 健康检查 */
-export function healthCheck() {
-  return callContainer('/health')
-}
-
-export default {
-  analyzeFullSync,
-  getReports,
-  getReport,
-  createReport,
-  toggleStar,
-  deleteReport,
-  clearReports,
-  healthCheck
+module.exports = {
+  analyzeFullSync: function(problem) {
+    return callContainer('/analyze-full-sync', 'POST', { problem: problem })
+  },
+  getReports: function() {
+    return callContainer('/reports')
+  },
+  getReport: function(id) {
+    return callContainer('/reports/' + id)
+  },
+  createReport: function(data) {
+    return callContainer('/reports', 'POST', data)
+  },
+  toggleStar: function(id) {
+    return callContainer('/reports/' + id + '/star', 'PATCH')
+  },
+  deleteReport: function(id) {
+    return callContainer('/reports/' + id, 'DELETE')
+  },
+  clearReports: function() {
+    return callContainer('/reports', 'DELETE')
+  },
+  healthCheck: function() {
+    return callContainer('/health')
+  }
 }

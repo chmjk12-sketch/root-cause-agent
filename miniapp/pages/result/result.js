@@ -1,6 +1,6 @@
 function markdownToHtml(md) {
   if (!md) return ''
-  let html = md
+  var html = md
     // Escape HTML
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -17,7 +17,7 @@ function markdownToHtml(md) {
     .replace(/`([^`]+)`/g, '<code style="background:#f0f0f5;padding:2px 6px;border-radius:3px;font-size:13px">$1</code>')
     // Code blocks
     .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:#f5f5f5;padding:12px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.5"><code>$2</code></pre>')
-    // Unordered lists  
+    // Unordered lists
     .replace(/^- (.+)$/gm, '<li style="margin:4px 0">$1</li>')
     .replace(/(<li[\s\S]*?<\/li>)/g, '<ul style="padding-left:20px;margin:8px 0">$1</ul>')
     // Ordered lists
@@ -33,7 +33,7 @@ function markdownToHtml(md) {
   // Wrap consecutive <li>s into a single <ul>
   html = html.replace(/(<li[\s\S]*?<\/li>)(<li)/g, '$1$2')
 
-  // Clean up empty paragraphs
+  // Clean up
   html = html.replace(/<p[^>]*>\s*<\/p>/g, '')
     .replace(/<br>\s*<br>/g, '<br>')
 
@@ -48,22 +48,22 @@ Page({
     htmlContent: ''
   },
 
-  onLoad() {
-    const result = getApp().globalData.currentResult
+  onLoad: function() {
+    var result = getApp().globalData.currentResult
     if (result) {
-      const htmlContent = markdownToHtml(result.markdown)
+      var htmlContent = markdownToHtml(result.markdown)
       this.setData({
         title: result.title || '根因分析报告',
         markdown: result.markdown,
-        htmlContent,
+        htmlContent: htmlContent,
         time: result.time || new Date().toLocaleString('zh-CN')
       })
     }
   },
 
-  saveToLocal() {
+  saveToLocal: function() {
     try {
-      const history = wx.getStorageSync('analysisHistory') || []
+      var history = wx.getStorageSync('analysisHistory') || []
       history.unshift({
         id: Date.now().toString(),
         title: this.data.title,
@@ -78,11 +78,10 @@ Page({
     }
   },
 
-  shareResult() {
-    wx.shareFileMessage({
-      filePath: this.data.markdown,
-      success: () => wx.showToast({ title: '分享成功', icon: 'success' }),
-      fail: () => wx.showToast({ title: '分享失败', icon: 'none' })
-    })
+  onShareAppMessage: function() {
+    return {
+      title: this.data.title || '根因分析报告',
+      path: '/pages/index/index'
+    }
   }
 })

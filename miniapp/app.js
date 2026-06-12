@@ -1,7 +1,6 @@
 App({
   onLaunch() {
-    // 初始化云托管（必须在调用 callContainer 前执行一次）
-    wx.cloud.init()
+    // wx.cloud.callContainer 无需提前 init，每次调用时传 config.env 即可
   },
 
   globalData: {
