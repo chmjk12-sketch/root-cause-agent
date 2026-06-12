@@ -1,8 +1,7 @@
 App({
   onLaunch() {
-    // wx.cloud.callContainer 无需提前 init，每次调用时传 config.env 即可
+    // 不调用 wx.cloud.init，避免模拟器超时
   },
-
   globalData: {
     currentResult: null
   }

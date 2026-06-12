@@ -1,32 +1,35 @@
-<view class="page safe-bottom">
-  <view class="card">
-    <text class="section-title">云托管配置</text>
+<view class="container">
+  <view class="header">
+    <text class="title">设置</text>
+  </view>
+
+  <view class="section">
+    <view class="section-title">存储</view>
     <view class="info-row">
-      <text class="info-label">环境ID</text>
-      <text class="info-value selectable">prod-d4gdb3koxd4c6f555</text>
+      <text class="info-label">本地缓存大小</text>
+      <text class="info-value">{{storageSize}}</text>
+    </view>
+    <button class="btn-danger" bindtap="clearCache">清空本地历史记录</button>
+  </view>
+
+  <view class="section">
+    <view class="section-title">云托管配置（真机模式）</view>
+    <view class="info-row">
+      <text class="info-label">环境 ID</text>
+      <text class="info-value selectable">{{envId}}</text>
     </view>
     <view class="info-row">
       <text class="info-label">服务名称</text>
-      <text class="info-value selectable">flask-1c4n</text>
+      <text class="info-value selectable">{{serviceName}}</text>
     </view>
-    <text class="form-tip">使用微信云托管内部通信，无需公网域名和备案</text>
+    <view class="form-tip">真机模式下将自动使用以上配置调用云托管后端（AI 分析）</view>
   </view>
 
-  <view class="card">
-    <text class="section-title">连接测试</text>
-    <button class="btn-secondary" bindtap="testConnection">测试后端连通性</button>
-    <text class="test-result {{testResultType}}" wx:if="{{testResult}}">{{testResult}}</text>
+  <view class="section">
+    <button class="btn-secondary" bindtap="showAbout">关于</button>
   </view>
 
-  <view class="card">
-    <text class="section-title">关于</text>
-    <view class="about-item">
-      <text class="about-label">版本</text>
-      <text class="about-value">1.0.0-cloud</text>
-    </view>
-    <view class="about-item">
-      <text class="about-label">通信方式</text>
-      <text class="about-value">云托管内部通信</text>
-    </view>
+  <view class="footer">
+    <text class="version">v{{version}} · 本地模拟模式</text>
   </view>
 </view>

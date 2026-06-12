@@ -1,6 +1,9 @@
+var api = require('../../utils/api.js')
+
 Page({
   data: {
-    list: []
+    list: [],
+    loading: false
   },
 
   onShow() {
@@ -8,13 +11,22 @@ Page({
   },
 
   loadHistory() {
-    const history = wx.getStorageSync('analysisHistory') || []
-    this.setData({ list: history })
+    this.setData({ loading: true })
+    api.getReports()
+      .then(res => {
+        if (res && res.success) {
+          this.setData({ list: res.reports || [] })
+        }
+        this.setData({ loading: false })
+      })
+      .catch(() => {
+        this.setData({ loading: false })
+      })
   },
 
   viewDetail(e) {
-    const { id } = e.currentTarget.dataset
-    const item = this.data.list.find(i => i.id === id)
+    var id = e.currentTarget.dataset.id
+    var item = this.data.list.find(function(i) { return i.id === id })
     if (item) {
       getApp().globalData.currentResult = {
         markdown: item.markdown || '',
@@ -26,42 +38,44 @@ Page({
   },
 
   toggleStar(e) {
-    const { id } = e.currentTarget.dataset
-    const history = wx.getStorageSync('analysisHistory') || []
-    const idx = history.findIndex(i => i.id === id)
-    if (idx > -1) {
-      history[idx].starred = !history[idx].starred
-      wx.setStorageSync('analysisHistory', history)
-      this.loadHistory()
-    }
+    var id = e.currentTarget.dataset.id
+    var that = this
+    api.toggleStar(id)
+      .then(function() {
+        that.loadHistory()
+      })
   },
 
   deleteItem(e) {
-    const { id } = e.currentTarget.dataset
+    var id = e.currentTarget.dataset.id
+    var that = this
     wx.showModal({
       title: '确认删除',
-      content: '确定要删除这条分析记录吗？',
-      success: (res) => {
+      content: '确定要删除这条记录吗？',
+      success: function(res) {
         if (res.confirm) {
-          const history = wx.getStorageSync('analysisHistory') || []
-          const filtered = history.filter(i => i.id !== id)
-          wx.setStorageSync('analysisHistory', filtered)
-          this.loadHistory()
-          wx.showToast({ title: '已删除', icon: 'success' })
+          api.deleteReport(id)
+            .then(function() {
+              that.loadHistory()
+              wx.showToast({ title: '已删除', icon: 'success' })
+            })
         }
       }
     })
   },
 
   clearAll() {
+    var that = this
     wx.showModal({
-      title: '确认清空',
-      content: '确定要清空所有历史记录吗？',
-      success: (res) => {
+      title: '清空历史',
+      content: '确定要清空所有历史记录吗？此操作不可恢复。',
+      success: function(res) {
         if (res.confirm) {
-          wx.setStorageSync('analysisHistory', [])
-          this.loadHistory()
-          wx.showToast({ title: '已清空', icon: 'success' })
+          api.clearReports()
+            .then(function() {
+              that.setData({ list: [] })
+              wx.showToast({ title: '已清空', icon: 'success' })
+            })
         }
       }
     })
