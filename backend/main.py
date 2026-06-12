@@ -85,6 +85,18 @@ async def analyze_full(req: AnalyzeRequest):
     )
 
 
+@app.get("/debug-env")
+async def debug_env():
+    """Debug: check which env vars are available (without exposing values)"""
+    vars_to_check = ['AI_API_KEY', 'AI_API_BASE', 'AI_DEFAULT_MODEL', 'SYSTEM_PROMPT_PATH',
+                     'COS_BUCKET', 'MYSQL_ADDRESS', 'MYSQL_USERNAME']
+    result = {}
+    for var in vars_to_check:
+        val = os.getenv(var)
+        result[var] = "✅ set" if val else "❌ NOT SET"
+    return result
+
+
 @app.post("/analyze-full-sync")
 async def analyze_full_sync(req: AnalyzeRequest):
     """Synchronous endpoint: returns the full analysis as JSON (for mini program clients)"""
